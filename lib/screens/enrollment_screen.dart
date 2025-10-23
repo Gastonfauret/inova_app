@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:inova_app/services/api_service.dart';
 import 'package:inova_app/services/device_info_service.dart';
+import 'package:inova_app/services/fcm_service.dart';
 import 'package:inova_app/models/device_model.dart';
+import 'package:inova_app/screens/qr_scanner_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EnrollmentScreen extends StatefulWidget {
   const EnrollmentScreen({super.key});
@@ -13,6 +16,7 @@ class EnrollmentScreen extends StatefulWidget {
 class _EnrollmentScreenState extends State<EnrollmentScreen> {
   final ApiService _apiService = ApiService();
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
+  FCMService? _fcmService;
 
   Map<String, String> _deviceInfo = {};
   bool _isLoading = false;
@@ -23,7 +27,17 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeFCM();
     _loadDeviceInfo();
+  }
+
+  Future<void> _initializeFCM() async {
+    try {
+      _fcmService = FCMService();
+      print('✅ FCM Service inicializado');
+    } catch (e) {
+      print('⚠️ FCM Service no disponible (Firebase no configurado)');
+    }
   }
 
   Future<void> _loadDeviceInfo() async {
@@ -56,15 +70,41 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
       // Obtener información del dispositivo
       final deviceData = await _deviceInfoService.getDeviceInfo();
 
-      print('📤 Enviando datos de enrollment: $deviceData');
+      // Obtener el FCM token (opcional)
+      String? fcmToken;
+      if (_fcmService != null) {
+        try {
+          fcmToken = await _fcmService!.getFCMToken();
+          print('🔑 Enviando FCM Token: $fcmToken');
+        } catch (e) {
+          print('⚠️ No se pudo obtener FCM Token: $e');
+        }
+      } else {
+        print('⚠️ FCM Service no disponible');
+      }
+
+      // Agregar campos requeridos por el backend (con conversión explícita)
+      final enrollmentData = Map<String, dynamic>.from(deviceData);
+      enrollmentData['licence_type'] = "0"; // Demo license (como string para evitar problemas con Laravel)
+      enrollmentData['next_lock_date'] = DateTime.now().add(const Duration(days: 30)).toIso8601String().substring(0, 16); // 30 días en el futuro
+      if (fcmToken != null) {
+        enrollmentData['fcm_token'] = fcmToken; // Token FCM para notificaciones (si está disponible)
+      }
+
+      print('📤 Enviando datos de enrollment: $enrollmentData');
 
       // Enrollar dispositivo en el backend
-      final response = await _apiService.enrollDevice(deviceData);
+      final response = await _apiService.enrollDevice(enrollmentData);
 
       print('📥 Respuesta del servidor: $response');
 
       if (response['err'] == false && response['data'] != null) {
         final enrolledDevice = DeviceModel.fromJson(response['data']);
+
+        // Guardar el código del dispositivo en SharedPreferences para usarlo en desbloqueos
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('device_code', enrolledDevice.code ?? '');
+        print('💾 Device code saved: ${enrolledDevice.code}');
 
         setState(() {
           _isEnrolled = true;
@@ -369,12 +409,17 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Botón de enrollment
+                  // Botón de escaneo QR
                   if (!_isEnrolled)
                     ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _enrollDevice,
-                      icon: const Icon(Icons.upload),
-                      label: const Text('Enrollar Dispositivo'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const QRScannerScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Escanear QR de Enrollment'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,

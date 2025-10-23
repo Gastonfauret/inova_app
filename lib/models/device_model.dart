@@ -70,8 +70,10 @@ class DeviceModel {
       device: json['device'],
       type: json['type'] ?? 1,
       identifier: json['identifier'],
-      licenceType: json['licence_type'],
-      code: json['code'],
+      licenceType: json['licence_type'] is String
+          ? int.tryParse(json['licence_type'])
+          : json['licence_type'],
+      code: json['code']?.toString(),
       brand: json['brand'],
       model: json['model'],
       manufacturer: json['manufacturer'],

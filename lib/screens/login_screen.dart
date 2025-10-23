@@ -11,18 +11,18 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _clientController = TextEditingController();
+  final _secretController = TextEditingController();
   final ApiService _apiService = ApiService();
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  bool _obscureSecret = true;
   String? _errorMessage;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _clientController.dispose();
+    _secretController.dispose();
     super.dispose();
   }
 
@@ -38,11 +38,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await _apiService.login(
-        _emailController.text.trim(),
-        _passwordController.text,
+        _clientController.text.trim(),
+        _secretController.text,
       );
 
-      if (response['err'] == false && response['token'] != null) {
+      if (response['token'] != null) {
         // Login exitoso, navegar a la pantalla de enrollment
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -109,14 +109,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Campo de email
+                  // Campo de client ID
                   TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _clientController,
                     decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'correo@ejemplo.com',
-                      prefixIcon: const Icon(Icons.email),
+                      labelText: 'Client ID',
+                      hintText: 'mobile-app-test',
+                      prefixIcon: const Icon(Icons.key),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -125,33 +124,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Por favor ingresa un email válido';
+                        return 'Por favor ingresa el Client ID';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
 
-                  // Campo de contraseña
+                  // Campo de secret
                   TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
+                    controller: _secretController,
+                    obscureText: _obscureSecret,
                     decoration: InputDecoration(
-                      labelText: 'Contraseña',
+                      labelText: 'Secret',
                       hintText: '••••••••',
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
+                          _obscureSecret
                               ? Icons.visibility_off
                               : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
-                            _obscurePassword = !_obscurePassword;
+                            _obscureSecret = !_obscureSecret;
                           });
                         },
                       ),
@@ -163,10 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
+                        return 'Por favor ingresa el Secret';
                       }
                       return null;
                     },

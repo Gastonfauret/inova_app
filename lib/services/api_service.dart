@@ -45,14 +45,14 @@ class ApiService {
     return prefs.getString('auth_token');
   }
 
-  // Login (para pruebas)
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  // Login (usando client/secret del backend actual)
+  Future<Map<String, dynamic>> login(String client, String secret) async {
     try {
       final response = await _dio.post(
         '/customer/auth/login',
         data: {
-          'email': email,
-          'password': password,
+          'client': client,
+          'secret': secret,
         },
       );
 
@@ -70,7 +70,7 @@ class ApiService {
   Future<Map<String, dynamic>> enrollDevice(Map<String, dynamic> deviceData) async {
     try {
       final response = await _dio.post(
-        '/customer/devices/enroll',
+        '/customer/devices/create',
         data: deviceData,
       );
       return response.data;
@@ -84,6 +84,27 @@ class ApiService {
     try {
       final response = await _dio.get('/customer/devices');
       return response.data;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Verificar código de desbloqueo
+  Future<Map<String, dynamic>> verifyUnlockCode(String deviceCode, String unlockCode) async {
+    try {
+      final response = await _dio.get(
+        '/emm/unlock-code/$deviceCode',
+        queryParameters: {
+          'unlock_code': unlockCode,
+        },
+      );
+      return response.data;
+    } on DioException catch (e) {
+      // Retornar el mensaje de error del servidor si existe
+      if (e.response != null && e.response?.data != null) {
+        return e.response!.data;
+      }
+      rethrow;
     } catch (e) {
       rethrow;
     }
