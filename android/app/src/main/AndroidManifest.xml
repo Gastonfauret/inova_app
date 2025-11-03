@@ -34,11 +34,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Intent filter for QR code provisioning -->
+            <intent-filter>
+                <action android:name="android.app.action.PROVISION_MANAGED_DEVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- Device Admin Receiver -->
         <receiver
-            android:name="inova.guard.mdm.receivers.OEMDeviceAdminReceiver"
+            android:name=".receivers.OEMDeviceAdminReceiver"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
             android:exported="true">
             <meta-data

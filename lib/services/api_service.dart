@@ -1,112 +1,187 @@
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:inova_app/config/app_config.dart';
+import 'package:inova_app/services/fcm_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  late Dio _dio;
+  late final Dio _dio;
 
   ApiService() {
     _dio = Dio(BaseOptions(
-      baseUrl: AppConfig.baseUrl,
+      baseUrl: AppConfig.getBaseUrl(),
       connectTimeout: AppConfig.connectTimeout,
       receiveTimeout: AppConfig.receiveTimeout,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
     ));
 
-    // Interceptor para agregar el token automáticamente
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
+    // Agregar interceptor para logging en modo debug
+    _dio.interceptors.add(LogInterceptor(
+      requestBody: true,
+      responseBody: true,
+      logPrint: (obj) => print('🌐 API: $obj'),
+    ));
+  }
+
+  // Este método es el que se llamará desde la EnrollmentScreen
+  Future<bool> enrollDevice({
+    required String enrollmentCode,
+    required String? deviceUid,
+    required FCMService fcmService,
+  }) async {
+    // 1. Asegurarse de que tenemos los datos necesarios
+    final String? fcmToken = fcmService.fcmToken;
+
+    // Si no hay deviceUid del Platform Channel, usar el enrollment code como fallback
+    String finalDeviceUid = deviceUid ?? enrollmentCode;
+    if (finalDeviceUid.isEmpty) {
+      print('❌ Error: Device UID es nulo o vacío.');
+      return false;
+    }
+
+    if (fcmToken == null || fcmToken.isEmpty) {
+      print('❌ Error: FCM Token es nulo o vacío.');
+      return false;
+    }
+
+    print('📱 Using deviceUid: $finalDeviceUid');
+
+    final String endpoint = '/emm/settings/$enrollmentCode/$finalDeviceUid/$fcmToken';
+    print('🚀 Realizando petición a: $endpoint');
+
+    try {
+      // 2. Realizar la petición GET
+      final response = await _dio.get(endpoint);
+
+      // 3. Procesar la respuesta
+      if (response.statusCode == 200 && response.data != null) {
+        print('✅ Respuesta recibida del servidor:');
+        print(response.data);
+
+        // 4. Guardar la configuración y el estado de enrolamiento
         final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('auth_token');
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
+        await prefs.setBool('isEnrolled', true);
+        await prefs.setString('device_code', enrollmentCode);
+
+        // Opcional: Guardar cualquier configuración recibida del backend
+        if (response.data is Map<String, dynamic>) {
+          response.data.forEach((key, value) async {
+            if (value is String) {
+              await prefs.setString('setting_$key', value);
+            } else if (value is bool) {
+              await prefs.setBool('setting_$key', value);
+            } else if (value is int) {
+              await prefs.setInt('setting_$key', value);
+            }
+          });
         }
-        return handler.next(options);
-      },
-      onError: (error, handler) {
-        print('Error en API: ${error.message}');
-        return handler.next(error);
-      },
-    ));
+        
+        print('💾 Dispositivo enrolado y configuración guardada.');
+        return true;
+      } else {
+        print('❌ Error: El servidor respondió con un estado inesperado: ${response.statusCode}');
+        return false;
+      }
+    } on DioException catch (e) {
+      print('❌ Error de red al intentar enrolar el dispositivo: $e');
+      if (e.response != null) {
+        print('Response data: ${e.response?.data}');
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error inesperado: $e');
+      return false;
+    }
   }
 
-  // Guardar token de autenticación
-  Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
-  }
+  // Método de autenticación con client credentials
+  Future<Map<String, dynamic>> login(String clientId, String secret) async {
+    final String endpoint = '/customer/auth/login';
+    print('🚀 Realizando petición de login a: $endpoint');
 
-  // Obtener token guardado
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
-  }
-
-  // Login (usando client/secret del backend actual)
-  Future<Map<String, dynamic>> login(String client, String secret) async {
     try {
       final response = await _dio.post(
-        '/customer/auth/login',
+        endpoint,
         data: {
-          'client': client,
+          'client': clientId,
           'secret': secret,
         },
       );
 
-      if (response.data['token'] != null) {
-        await saveToken(response.data['token']);
+      if (response.statusCode == 200 && response.data != null) {
+        print('✅ Login exitoso');
+
+        // Guardar el token en SharedPreferences
+        if (response.data['token'] != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', response.data['token']);
+        }
+
+        return response.data as Map<String, dynamic>;
+      } else {
+        return {
+          'token': null,
+          'message': 'Respuesta inesperada del servidor'
+        };
       }
-
-      return response.data;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Enrollar dispositivo
-  Future<Map<String, dynamic>> enrollDevice(Map<String, dynamic> deviceData) async {
-    try {
-      final response = await _dio.post(
-        '/customer/devices/create',
-        data: deviceData,
-      );
-      return response.data;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Obtener lista de dispositivos
-  Future<Map<String, dynamic>> getDevices() async {
-    try {
-      final response = await _dio.get('/customer/devices');
-      return response.data;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Verificar código de desbloqueo
-  Future<Map<String, dynamic>> verifyUnlockCode(String deviceCode, String unlockCode) async {
-    try {
-      final response = await _dio.get(
-        '/emm/unlock-code/$deviceCode',
-        queryParameters: {
-          'unlock_code': unlockCode,
-        },
-      );
-      return response.data;
     } on DioException catch (e) {
-      // Retornar el mensaje de error del servidor si existe
-      if (e.response != null && e.response?.data != null) {
-        return e.response!.data;
+      print('❌ Error de autenticación: $e');
+      if (e.response != null && e.response?.statusCode == 404) {
+        return {
+          'token': null,
+          'message': 'Credenciales inválidas'
+        };
       }
-      rethrow;
+      return {
+        'token': null,
+        'message': 'Error de conexión'
+      };
     } catch (e) {
-      rethrow;
+      print('❌ Error inesperado: $e');
+      return {
+        'token': null,
+        'message': 'Ocurrió un error inesperado'
+      };
     }
   }
-}
+
+  // Placeholder para el método que la pantalla de enrolamiento usaba antes.
+  // Lo dejamos para evitar errores de compilación, pero no se usará.
+    Future<bool> validateEnrollmentCode(String code) async {
+      return false;
+    }
+  
+    Future<Map<String, dynamic>> verifyUnlockCode(String deviceCode, String code) async {
+      // Endpoint correcto: /emm/unlock-code/{deviceCode}
+      // Este endpoint NO requiere autenticación
+      final String endpoint = '/emm/unlock-code/$deviceCode';
+      print('🚀 Realizando petición a: $endpoint');
+      print('🔑 Código de desbloqueo: $code');
+
+      try {
+        final response = await _dio.post(
+          endpoint,
+          data: {'unlock_code': code}, // Nombre correcto del parámetro
+        );
+
+        if (response.statusCode == 200 && response.data != null) {
+          print('✅ Respuesta de verificación: ${response.data}');
+          return response.data as Map<String, dynamic>;
+        } else {
+          return {'err': true, 'message': 'Respuesta inesperada del servidor'};
+        }
+      } on DioException catch (e) {
+        print('❌ Error de red al verificar el código de desbloqueo: $e');
+        if (e.response != null) {
+          print('📥 Response data: ${e.response?.data}');
+          // Si el backend retorna un error con estructura, usarlo
+          if (e.response?.data is Map<String, dynamic>) {
+            return e.response!.data as Map<String, dynamic>;
+          }
+        }
+        return {'err': true, 'message': 'Error de conexión'};
+      } catch (e) {
+        print('❌ Error inesperado: $e');
+        return {'err': true, 'message': 'Ocurrió un error inesperado'};
+      }
+    }
+  }
+  

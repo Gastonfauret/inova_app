@@ -1,476 +1,178 @@
+
 import 'package:flutter/material.dart';
+import 'package:inova_app/screens/home_screen.dart';
 import 'package:inova_app/services/api_service.dart';
-import 'package:inova_app/services/device_info_service.dart';
 import 'package:inova_app/services/fcm_service.dart';
-import 'package:inova_app/models/device_model.dart';
-import 'package:inova_app/screens/qr_scanner_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EnrollmentScreen extends StatefulWidget {
-  const EnrollmentScreen({super.key});
+  final String? deviceCode; // Este código puede venir del lado nativo (UID)
+  final FCMService? fcmService;
+
+  const EnrollmentScreen({super.key, this.deviceCode, this.fcmService});
 
   @override
   State<EnrollmentScreen> createState() => _EnrollmentScreenState();
 }
 
 class _EnrollmentScreenState extends State<EnrollmentScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
   final ApiService _apiService = ApiService();
-  final DeviceInfoService _deviceInfoService = DeviceInfoService();
-  FCMService? _fcmService;
 
-  Map<String, String> _deviceInfo = {};
   bool _isLoading = false;
-  bool _isEnrolled = false;
-  DeviceModel? _enrolledDevice;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _initializeFCM();
-    _loadDeviceInfo();
-  }
-
-  Future<void> _initializeFCM() async {
-    try {
-      _fcmService = FCMService();
-      print('✅ FCM Service inicializado');
-    } catch (e) {
-      print('⚠️ FCM Service no disponible (Firebase no configurado)');
-    }
-  }
-
-  Future<void> _loadDeviceInfo() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final info = await _deviceInfoService.getReadableDeviceInfo();
-      setState(() {
-        _deviceInfo = info;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error al cargar información del dispositivo: $e';
-        _isLoading = false;
-      });
-    }
+    // No pre-rellenamos el código, el usuario debe introducir el que ve en la web.
+    // widget.deviceCode se usará como el UID del dispositivo.
   }
 
   Future<void> _enrollDevice() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_formKey.currentState!.validate()) {
+      print('🔵 Iniciando proceso de enrollment...');
 
-    try {
-      // Obtener información del dispositivo
-      final deviceData = await _deviceInfoService.getDeviceInfo();
-
-      // Obtener el FCM token (opcional)
-      String? fcmToken;
-      if (_fcmService != null) {
-        try {
-          fcmToken = await _fcmService!.getFCMToken();
-          print('🔑 Enviando FCM Token: $fcmToken');
-        } catch (e) {
-          print('⚠️ No se pudo obtener FCM Token: $e');
-        }
-      } else {
-        print('⚠️ FCM Service no disponible');
-      }
-
-      // Agregar campos requeridos por el backend (con conversión explícita)
-      final enrollmentData = Map<String, dynamic>.from(deviceData);
-      enrollmentData['licence_type'] = "0"; // Demo license (como string para evitar problemas con Laravel)
-      enrollmentData['next_lock_date'] = DateTime.now().add(const Duration(days: 30)).toIso8601String().substring(0, 16); // 30 días en el futuro
-      if (fcmToken != null) {
-        enrollmentData['fcm_token'] = fcmToken; // Token FCM para notificaciones (si está disponible)
-      }
-
-      print('📤 Enviando datos de enrollment: $enrollmentData');
-
-      // Enrollar dispositivo en el backend
-      final response = await _apiService.enrollDevice(enrollmentData);
-
-      print('📥 Respuesta del servidor: $response');
-
-      if (response['err'] == false && response['data'] != null) {
-        final enrolledDevice = DeviceModel.fromJson(response['data']);
-
-        // Guardar el código del dispositivo en SharedPreferences para usarlo en desbloqueos
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('device_code', enrolledDevice.code ?? '');
-        print('💾 Device code saved: ${enrolledDevice.code}');
-
-        setState(() {
-          _isEnrolled = true;
-          _enrolledDevice = enrolledDevice;
-          _isLoading = false;
-        });
-
-        _showSuccessDialog();
-      } else {
-        setState(() {
-          _errorMessage = response['message'] ?? 'Error desconocido';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('❌ Error en enrollment: $e');
       setState(() {
-        _errorMessage = 'Error al enrollar dispositivo: $e';
-        _isLoading = false;
+        _isLoading = true;
+        _errorMessage = null;
       });
-      _showErrorDialog(e.toString());
-    }
-  }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
-            SizedBox(width: 10),
-            Text('¡Enrollment Exitoso!'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('El dispositivo ha sido enrollado correctamente.'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Código de Dispositivo:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _enrolledDevice?.code ?? 'N/A',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'ID: ${_enrolledDevice?.id}',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            Text(
-              'Estado: ${_enrolledDevice?.statusName}',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+      // Verificar FCM Service
+      if (widget.fcmService == null) {
+        print('❌ FCM Service es NULL');
+        setState(() {
+          _errorMessage = 'El servicio de notificaciones no está disponible. No se puede enrolar.';
+          _isLoading = false;
+        });
+        return;
+      }
 
-  void _showErrorDialog(String error) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.error, color: Colors.red, size: 28),
-            SizedBox(width: 10),
-            Text('Error de Enrollment'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('No se pudo enrollar el dispositivo:'),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                error,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.red.shade900,
+      print('✅ FCM Service disponible');
+
+      final code = _codeController.text.trim();
+      print('📝 Código ingresado: $code');
+
+      try {
+        print('🚀 Llamando a enrollDevice...');
+        final isSuccess = await _apiService.enrollDevice(
+          enrollmentCode: code,
+          deviceUid: widget.deviceCode,
+          fcmService: widget.fcmService!,
+        );
+
+        print('📊 Resultado de enrollment: $isSuccess');
+
+        if (!mounted) {
+          print('⚠️ Widget no está montado, abortando navegación');
+          return;
+        }
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (isSuccess) {
+          print('✅ Enrollment exitoso, mostrando mensaje...');
+
+          // Mostrar diálogo de éxito
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('✅ Éxito'),
+              content: const Text('Dispositivo enlazado correctamente'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Cerrar diálogo
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    );
+                  },
+                  child: const Text('Continuar'),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
+          );
+        } else {
+          print('❌ Enrollment falló');
+          setState(() {
+            _errorMessage = 'El código no es válido o hubo un error al conectar con el servidor.';
+          });
+        }
+      } catch (e) {
+        print('❌ Excepción durante enrollment: $e');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Error inesperado: $e';
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Enrollment de Dispositivo'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+        title: const Text('Enrolamiento de Dispositivo'),
       ),
-      body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Cargando...'),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Título y descripción
-                  Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Icon(
-                            _isEnrolled ? Icons.check_circle : Icons.phone_android,
-                            size: 64,
-                            color: _isEnrolled ? Colors.green : Colors.deepPurple,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _isEnrolled
-                                ? '✅ Dispositivo Enrollado'
-                                : 'Información del Dispositivo',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isEnrolled
-                                ? 'El dispositivo ha sido registrado exitosamente en el sistema MDM.'
-                                : 'Revisa la información y presiona "Enrollar Dispositivo" para continuar.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                const Text(
+                  'Por favor, ingrese su código de enlace para continuar.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Código de Enlace',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.vpn_key),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El código no puede estar vacío';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                if (_isLoading)
+                  const CircularProgressIndicator()
+                else
+                  ElevatedButton(
+                    onPressed: _enrollDevice,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                      textStyle: const TextStyle(fontSize: 16),
+                    ),
+                    child: const Text('Enlazar Dispositivo'),
+                  ),
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 14),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // Información del dispositivo
-                  if (!_isEnrolled) ...[
-                    const Text(
-                      'Datos del Dispositivo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: _deviceInfo.entries
-                              .map((entry) => Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        SizedBox(
-                                          width: 140,
-                                          child: Text(
-                                            entry.key,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            entry.value,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Información del dispositivo enrollado
-                  if (_isEnrolled && _enrolledDevice != null) ...[
-                    const Text(
-                      'Detalles del Enrollment',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      elevation: 2,
-                      color: Colors.green.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildInfoRow('ID', '${_enrolledDevice!.id}'),
-                            _buildInfoRow('Código', _enrolledDevice!.code ?? 'N/A'),
-                            _buildInfoRow('Dispositivo', _enrolledDevice!.device ?? 'N/A'),
-                            _buildInfoRow('Marca', _enrolledDevice!.brand ?? 'N/A'),
-                            _buildInfoRow('Modelo', _enrolledDevice!.model ?? 'N/A'),
-                            _buildInfoRow('Tipo', _enrolledDevice!.typeName),
-                            _buildInfoRow('Estado', _enrolledDevice!.statusName),
-                            _buildInfoRow('IMEI', _enrolledDevice!.imei ?? 'N/A'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 24),
-
-                  // Mensajes de error
-                  if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error, color: Colors.red),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(color: Colors.red.shade900),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Botón de escaneo QR
-                  if (!_isEnrolled)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const QRScannerScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Escanear QR de Enrollment'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-
-                  // Botón de reintentar
-                  if (_isEnrolled)
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isEnrolled = false;
-                          _enrolledDevice = null;
-                        });
-                        _loadDeviceInfo();
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Enrollar Otro Dispositivo'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              ],
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
