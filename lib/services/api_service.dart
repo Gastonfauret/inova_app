@@ -27,67 +27,137 @@ class ApiService {
     required String? deviceUid,
     required FCMService fcmService,
   }) async {
+    print('\n════════════════════════════════════════');
+    print('🚀 INICIANDO PROCESO DE ENROLLMENT');
+    print('════════════════════════════════════════');
+
     // 1. Asegurarse de que tenemos los datos necesarios
+    print('📋 Datos de entrada:');
+    print('   - Enrollment Code: $enrollmentCode');
+    print('   - Device UID (del Platform Channel): $deviceUid');
+
     final String? fcmToken = fcmService.fcmToken;
+    print('   - FCM Token: ${fcmToken ?? "NULL"}');
+    print('   - FCM Token length: ${fcmToken?.length ?? 0}');
 
     // Si no hay deviceUid del Platform Channel, usar el enrollment code como fallback
     String finalDeviceUid = deviceUid ?? enrollmentCode;
+    print('\n🔧 Procesamiento:');
+    print('   - Device UID final (después de fallback): $finalDeviceUid');
+
     if (finalDeviceUid.isEmpty) {
-      print('❌ Error: Device UID es nulo o vacío.');
+      print('❌ ERROR CRÍTICO: Device UID es nulo o vacío después del fallback.');
       return false;
     }
 
     if (fcmToken == null || fcmToken.isEmpty) {
-      print('❌ Error: FCM Token es nulo o vacío.');
+      print('❌ ERROR CRÍTICO: FCM Token es nulo o vacío.');
+      print('   - Verifica que Firebase esté inicializado correctamente');
+      print('   - Verifica google-services.json');
       return false;
     }
 
-    print('📱 Using deviceUid: $finalDeviceUid');
-
     final String endpoint = '/emm/settings/$enrollmentCode/$finalDeviceUid/$fcmToken';
-    print('🚀 Realizando petición a: $endpoint');
+    final String fullUrl = '${AppConfig.getBaseUrl()}$endpoint';
+
+    print('\n🌐 Información de conexión:');
+    print('   - Base URL: ${AppConfig.getBaseUrl()}');
+    print('   - Endpoint: $endpoint');
+    print('   - URL Completa: $fullUrl');
 
     try {
-      // 2. Realizar la petición GET
+      print('\n📤 Realizando petición GET al servidor...');
       final response = await _dio.get(endpoint);
+
+      print('\n📥 Respuesta recibida:');
+      print('   - Status Code: ${response.statusCode}');
+      print('   - Headers: ${response.headers}');
+      print('   - Data Type: ${response.data.runtimeType}');
+      print('   - Data: ${response.data}');
 
       // 3. Procesar la respuesta
       if (response.statusCode == 200 && response.data != null) {
-        print('✅ Respuesta recibida del servidor:');
+        print('\n✅ RESPUESTA EXITOSA (200 OK)');
+        print('📦 Datos recibidos del servidor:');
         print(response.data);
 
         // 4. Guardar la configuración y el estado de enrolamiento
+        print('\n💾 Guardando configuración local...');
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isEnrolled', true);
         await prefs.setString('device_code', enrollmentCode);
+        print('   ✓ isEnrolled = true');
+        print('   ✓ device_code = $enrollmentCode');
 
         // Opcional: Guardar cualquier configuración recibida del backend
         if (response.data is Map<String, dynamic>) {
+          print('\n💾 Guardando configuraciones adicionales del servidor...');
           response.data.forEach((key, value) async {
             if (value is String) {
               await prefs.setString('setting_$key', value);
+              print('   ✓ setting_$key (String) = $value');
             } else if (value is bool) {
               await prefs.setBool('setting_$key', value);
+              print('   ✓ setting_$key (bool) = $value');
             } else if (value is int) {
               await prefs.setInt('setting_$key', value);
+              print('   ✓ setting_$key (int) = $value');
             }
           });
         }
-        
-        print('💾 Dispositivo enrolado y configuración guardada.');
+
+        print('\n✅ ¡ENROLLMENT COMPLETADO EXITOSAMENTE!');
+        print('════════════════════════════════════════\n');
         return true;
       } else {
-        print('❌ Error: El servidor respondió con un estado inesperado: ${response.statusCode}');
+        print('\n❌ ERROR: Respuesta inesperada del servidor');
+        print('   - Status Code: ${response.statusCode}');
+        print('   - Se esperaba 200, se recibió: ${response.statusCode}');
+        print('════════════════════════════════════════\n');
         return false;
       }
     } on DioException catch (e) {
-      print('❌ Error de red al intentar enrolar el dispositivo: $e');
+      print('\n❌ ERROR DE RED (DioException)');
+      print('   - Tipo de error: ${e.type}');
+      print('   - Mensaje: ${e.message}');
+
       if (e.response != null) {
-        print('Response data: ${e.response?.data}');
+        print('\n📥 Respuesta de error del servidor:');
+        print('   - Status Code: ${e.response?.statusCode}');
+        print('   - Status Message: ${e.response?.statusMessage}');
+        print('   - Headers: ${e.response?.headers}');
+        print('   - Data: ${e.response?.data}');
+        print('   - Data Type: ${e.response?.data.runtimeType}');
+
+        // Extraer mensaje específico si existe
+        if (e.response?.data is Map) {
+          final errorData = e.response?.data as Map;
+          if (errorData.containsKey('error')) {
+            print('\n⚠️ Mensaje de error del servidor:');
+            print('   ${errorData['error']}');
+          }
+          if (errorData.containsKey('message')) {
+            print('\n⚠️ Mensaje del servidor:');
+            print('   ${errorData['message']}');
+          }
+        }
+      } else {
+        print('\n⚠️ No hay respuesta del servidor');
+        print('   - Posibles causas:');
+        print('     • Sin conexión a internet');
+        print('     • El servidor no está disponible');
+        print('     • Timeout de conexión');
+        print('     • Problema de DNS');
       }
+
+      print('════════════════════════════════════════\n');
       return false;
     } catch (e) {
-      print('❌ Error inesperado: $e');
+      print('\n❌ ERROR INESPERADO');
+      print('   - Tipo: ${e.runtimeType}');
+      print('   - Mensaje: $e');
+      print('   - Stack trace disponible en logs completos');
+      print('════════════════════════════════════════\n');
       return false;
     }
   }
@@ -145,43 +215,149 @@ class ApiService {
 
   // Placeholder para el método que la pantalla de enrolamiento usaba antes.
   // Lo dejamos para evitar errores de compilación, pero no se usará.
-    Future<bool> validateEnrollmentCode(String code) async {
-      return false;
-    }
-  
-    Future<Map<String, dynamic>> verifyUnlockCode(String deviceCode, String code) async {
-      // Endpoint correcto: /emm/unlock-code/{deviceCode}
-      // Este endpoint NO requiere autenticación
-      final String endpoint = '/emm/unlock-code/$deviceCode';
-      print('🚀 Realizando petición a: $endpoint');
-      print('🔑 Código de desbloqueo: $code');
+  Future<bool> validateEnrollmentCode(String code) async {
+    return false;
+  }
 
-      try {
-        final response = await _dio.post(
-          endpoint,
-          data: {'unlock_code': code}, // Nombre correcto del parámetro
-        );
+  Future<Map<String, dynamic>> verifyUnlockCode(String deviceCode, String code) async {
+    // Endpoint correcto: /emm/unlock-code/{deviceCode}
+    // Este endpoint NO requiere autenticación
+    final String endpoint = '/emm/unlock-code/$deviceCode';
+    print('🚀 Realizando petición a: $endpoint');
+    print('🔑 Código de desbloqueo: $code');
 
-        if (response.statusCode == 200 && response.data != null) {
-          print('✅ Respuesta de verificación: ${response.data}');
-          return response.data as Map<String, dynamic>;
-        } else {
-          return {'err': true, 'message': 'Respuesta inesperada del servidor'};
-        }
-      } on DioException catch (e) {
-        print('❌ Error de red al verificar el código de desbloqueo: $e');
-        if (e.response != null) {
-          print('📥 Response data: ${e.response?.data}');
-          // Si el backend retorna un error con estructura, usarlo
-          if (e.response?.data is Map<String, dynamic>) {
-            return e.response!.data as Map<String, dynamic>;
-          }
-        }
-        return {'err': true, 'message': 'Error de conexión'};
-      } catch (e) {
-        print('❌ Error inesperado: $e');
-        return {'err': true, 'message': 'Ocurrió un error inesperado'};
+    try {
+      final response = await _dio.post(
+        endpoint,
+        data: {'unlock_code': code}, // Nombre correcto del parámetro
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        print('✅ Respuesta de verificación: ${response.data}');
+        return response.data as Map<String, dynamic>;
+      } else {
+        return {'err': true, 'message': 'Respuesta inesperada del servidor'};
       }
+    } on DioException catch (e) {
+      print('❌ Error de red al verificar el código de desbloqueo: $e');
+      if (e.response != null) {
+        print('📥 Response data: ${e.response?.data}');
+        // Si el backend retorna un error con estructura, usarlo
+        if (e.response?.data is Map<String, dynamic>) {
+          return e.response!.data as Map<String, dynamic>;
+        }
+      }
+      return {'err': true, 'message': 'Error de conexión'};
+    } catch (e) {
+      print('❌ Error inesperado: $e');
+      return {'err': true, 'message': 'Ocurrió un error inesperado'};
     }
   }
-  
+
+  // Actualizar FCM Token en el backend
+  Future<bool> updateFcmToken(String deviceCode, String fcmToken) async {
+    print('\n📤 ACTUALIZANDO FCM TOKEN EN BACKEND');
+    print('   - Device Code: $deviceCode');
+    print('   - FCM Token: ${fcmToken.substring(0, 20)}...');
+
+    // TODO: Implementar endpoint en backend
+    // final String endpoint = '/emm/device/$deviceCode/fcm-token';
+
+    try {
+      // Por ahora solo simular éxito
+      // En producción, descomentar esto:
+      /*
+      final response = await _dio.put(
+        endpoint,
+        data: {'fcm_token': fcmToken},
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ FCM Token actualizado en backend');
+        return true;
+      }
+      */
+
+      print('⚠️ Endpoint no implementado - simulando éxito');
+      return true;
+
+    } catch (e) {
+      print('❌ Error al actualizar FCM token: $e');
+      return false;
+    }
+  }
+
+  // Enviar heartbeat al backend
+  Future<bool> sendHeartbeat(String deviceCode, Map<String, dynamic> data) async {
+    print('\n💓 ENVIANDO HEARTBEAT AL BACKEND');
+    print('   - Device Code: $deviceCode');
+
+    // TODO: Implementar endpoint en backend
+    // final String endpoint = '/emm/device/$deviceCode/heartbeat';
+
+    try {
+      // Por ahora solo simular éxito
+      // En producción, descomentar esto:
+      /*
+      final response = await _dio.post(
+        endpoint,
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Heartbeat enviado exitosamente');
+        return true;
+      }
+      */
+
+      print('⚠️ Endpoint no implementado - simulando éxito');
+      return true;
+
+    } catch (e) {
+      print('❌ Error al enviar heartbeat: $e');
+      return false;
+    }
+  }
+
+  // Obtener configuración actualizada del dispositivo
+  Future<Map<String, dynamic>?> getDeviceConfig(String deviceCode) async {
+    print('\n⚙️ OBTENIENDO CONFIGURACIÓN DEL DISPOSITIVO');
+    print('   - Device Code: $deviceCode');
+
+    final String endpoint = '/emm/device/$deviceCode/config';
+
+    try {
+      final response = await _dio.get(endpoint);
+
+      if (response.statusCode == 200 && response.data != null) {
+        print('✅ Configuración obtenida');
+        return response.data as Map<String, dynamic>;
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error al obtener configuración: $e');
+      return null;
+    }
+  }
+
+  // Reportar estado del dispositivo
+  Future<bool> reportDeviceStatus(String deviceCode, Map<String, dynamic> status) async {
+    print('\n📊 REPORTANDO ESTADO DEL DISPOSITIVO');
+    print('   - Device Code: $deviceCode');
+    print('   - Status: ${status['status']}');
+
+    // TODO: Implementar endpoint en backend
+    // final String endpoint = '/emm/device/$deviceCode/status';
+
+    try {
+      // Por ahora solo simular éxito
+      print('⚠️ Endpoint no implementado - simulando éxito');
+      return true;
+
+    } catch (e) {
+      print('❌ Error al reportar estado: $e');
+      return false;
+    }
+  }
+}

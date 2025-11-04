@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:inova_app/screens/home_screen.dart';
 import 'package:inova_app/services/api_service.dart';
 import 'package:inova_app/services/fcm_service.dart';
+import 'package:inova_app/services/device_info_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EnrollmentScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final DeviceInfoService _deviceInfoService = DeviceInfoService();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -32,40 +34,65 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
 
   Future<void> _enrollDevice() async {
     if (_formKey.currentState!.validate()) {
-      print('🔵 Iniciando proceso de enrollment...');
+      print('\n╔════════════════════════════════════════╗');
+      print('║  ENROLLMENT SCREEN - INICIO           ║');
+      print('╚════════════════════════════════════════╝');
 
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
 
+      print('\n📋 Estado inicial:');
+      print('   - Widget deviceCode: ${widget.deviceCode ?? "NULL"}');
+      print('   - FCM Service disponible: ${widget.fcmService != null}');
+
       // Verificar FCM Service
       if (widget.fcmService == null) {
-        print('❌ FCM Service es NULL');
+        print('\n❌ ERROR CRÍTICO: FCM Service es NULL');
+        print('   - Firebase no se inicializó correctamente');
+        print('   - Revisa los logs de inicialización de Firebase en main.dart');
         setState(() {
           _errorMessage = 'El servicio de notificaciones no está disponible. No se puede enrolar.';
           _isLoading = false;
         });
+        print('╚════════════════════════════════════════╝\n');
         return;
       }
 
       print('✅ FCM Service disponible');
+      print('   - FCM Token: ${widget.fcmService!.fcmToken ?? "NULL"}');
 
       final code = _codeController.text.trim();
-      print('📝 Código ingresado: $code');
+      print('\n📝 Código ingresado por el usuario:');
+      print('   - Código: "$code"');
+      print('   - Longitud: ${code.length} caracteres');
+      print('   - Es vacío: ${code.isEmpty}');
+
+      // Obtener el Android ID real del dispositivo
+      print('\n🔧 Obteniendo Android ID real del dispositivo...');
+      final String deviceId = await _deviceInfoService.getDeviceId();
+      print('✅ Device ID obtenido: $deviceId');
 
       try {
-        print('🚀 Llamando a enrollDevice...');
+        print('\n🚀 Llamando a ApiService.enrollDevice()...');
+        print('   - enrollmentCode: $code');
+        print('   - deviceUid (Platform Channel): ${widget.deviceCode}');
+        print('   - deviceId (Android ID real): $deviceId');
+        print('   - fcmService: ${widget.fcmService}');
+
         final isSuccess = await _apiService.enrollDevice(
           enrollmentCode: code,
-          deviceUid: widget.deviceCode,
+          deviceUid: deviceId, // Usamos el Android ID real
           fcmService: widget.fcmService!,
         );
 
-        print('📊 Resultado de enrollment: $isSuccess');
+        print('\n📊 RESULTADO DE ENROLLMENT:');
+        print('   - Éxito: $isSuccess');
 
         if (!mounted) {
           print('⚠️ Widget no está montado, abortando navegación');
+          print('╚════════════════════════════════════════╝\n');
           return;
         }
 
@@ -74,7 +101,9 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
         });
 
         if (isSuccess) {
-          print('✅ Enrollment exitoso, mostrando mensaje...');
+          print('\n✅ ¡ENROLLMENT EXITOSO!');
+          print('   - Mostrando diálogo de éxito al usuario');
+          print('   - Preparando navegación a HomeScreen');
 
           // Mostrar diálogo de éxito
           showDialog(
@@ -86,10 +115,14 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
               actions: [
                 TextButton(
                   onPressed: () {
+                    print('👤 Usuario presionó "Continuar"');
+                    print('   - Cerrando diálogo');
+                    print('   - Navegando a HomeScreen');
                     Navigator.of(context).pop(); // Cerrar diálogo
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(builder: (context) => const HomeScreen()),
                     );
+                    print('╚════════════════════════════════════════╝\n');
                   },
                   child: const Text('Continuar'),
                 ),
@@ -97,20 +130,32 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
             ),
           );
         } else {
-          print('❌ Enrollment falló');
+          print('\n❌ ENROLLMENT FALLÓ');
+          print('   - El servidor rechazó el enrollment');
+          print('   - Revisa los logs de ApiService para más detalles');
           setState(() {
             _errorMessage = 'El código no es válido o hubo un error al conectar con el servidor.';
           });
+          print('╚════════════════════════════════════════╝\n');
         }
-      } catch (e) {
-        print('❌ Excepción durante enrollment: $e');
+      } catch (e, stackTrace) {
+        print('\n❌ EXCEPCIÓN DURANTE ENROLLMENT');
+        print('   - Tipo: ${e.runtimeType}');
+        print('   - Mensaje: $e');
+        print('   - Stack Trace:');
+        print(stackTrace.toString().split('\n').take(5).join('\n'));
+
         if (mounted) {
           setState(() {
             _errorMessage = 'Error inesperado: $e';
             _isLoading = false;
           });
         }
+        print('╚════════════════════════════════════════╝\n');
       }
+    } else {
+      print('\n⚠️ Validación de formulario falló');
+      print('   - El código ingresado no es válido o está vacío');
     }
   }
 

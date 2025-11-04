@@ -7,27 +7,65 @@ import 'package:inova_app/screens/enrollment_screen.dart';
 import 'package:inova_app/screens/home_screen.dart';
 import 'package:inova_app/screens/lock_screen.dart';
 import 'package:inova_app/services/fcm_service.dart';
+import 'package:inova_app/services/heartbeat_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  print('\n╔════════════════════════════════════════╗');
+  print('║       INOVA MDM - INICIO DE APP      ║');
+  print('╚════════════════════════════════════════╝\n');
 
+  print('⚙️ Inicializando Flutter bindings...');
   WidgetsFlutterBinding.ensureInitialized();
+  print('✅ Flutter bindings inicializados\n');
 
   FCMService? fcmService;
   try {
+    print('🔥 Inicializando Firebase...');
     await Firebase.initializeApp();
-    print('✅ Firebase inicializado correctamente');
+    print('✅ Firebase inicializado correctamente\n');
+
+    print('📱 Inicializando FCM Service...');
     fcmService = FCMService();
     await fcmService.initialize();
-  } catch (e) {
-    print('❌ Error al inicializar Firebase: $e');
-    print('⚠️ La app funcionará sin notificaciones FCM');
+    print('✅ FCM Service inicializado correctamente\n');
+
+  } catch (e, stackTrace) {
+    print('❌ ERROR AL INICIALIZAR FIREBASE/FCM');
+    print('   - Tipo de error: ${e.runtimeType}');
+    print('   - Mensaje: $e');
+    print('   - Stack Trace:');
+    print(stackTrace.toString().split('\n').take(5).join('\n'));
+    print('\n⚠️ ADVERTENCIA: La app funcionará sin notificaciones FCM');
+    print('   - El enrollment podría fallar si FCM es requerido');
+    print('   - Verifica la configuración de Firebase:');
+    print('     • android/app/google-services.json existe y es válido');
+    print('     • Firebase está habilitado en el proyecto');
+    print('     • Las dependencias están correctamente instaladas\n');
   }
 
   // Chequea si el dispositivo ya está enrolado
+  print('💾 Verificando estado de enrollment...');
   final prefs = await SharedPreferences.getInstance();
   final bool isEnrolled = prefs.getBool('isEnrolled') ?? false;
+  final String? deviceCode = prefs.getString('device_code');
+
+  print('📊 Estado de SharedPreferences:');
+  print('   - isEnrolled: $isEnrolled');
+  print('   - device_code: ${deviceCode ?? "NULL"}');
+
+  if (isEnrolled) {
+    print('✅ Dispositivo ya está enrolado');
+    print('   - El usuario verá la pantalla principal (HomeScreen o LockScreen)');
+  } else {
+    print('⚠️ Dispositivo NO está enrolado');
+    print('   - El usuario verá la pantalla de enrollment');
+  }
+
+  print('\n🚀 Iniciando aplicación...');
+  print('   - fcmService disponible: ${fcmService != null}');
+  print('   - isEnrolled: $isEnrolled');
+  print('╚════════════════════════════════════════╝\n');
 
   runApp(MyApp(fcmService: fcmService, isEnrolled: isEnrolled));
 }
@@ -44,6 +82,8 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const platform = MethodChannel('inova.guard.mdm/provisioning');
+  final HeartbeatService _heartbeatService = HeartbeatService();
+
   String? _deviceCode;
   bool _isLocked = false;
 
@@ -57,16 +97,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _getDeviceCodeFromNative();
       _checkLockStatus();
 
+      // Iniciar heartbeat service
+      _heartbeatService.start(widget.fcmService);
+      print('✅ Heartbeat service iniciado');
+
       if (widget.fcmService != null) {
         widget.fcmService!.commandStream.listen((command) {
+          print('\n📨 COMANDO RECIBIDO VIA FCM STREAM');
+          print('   - Comando: ${command['command']}');
+
           if (command['command'] == 'lock') {
             setState(() {
               _isLocked = true;
             });
+            print('   - Dispositivo bloqueado via FCM');
           } else if (command['command'] == 'unlock') {
             setState(() {
               _isLocked = false;
             });
+            print('   - Dispositivo desbloqueado via FCM');
           }
         });
       }
@@ -76,6 +125,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _heartbeatService.stop();
+    widget.fcmService?.dispose();
     super.dispose();
   }
 

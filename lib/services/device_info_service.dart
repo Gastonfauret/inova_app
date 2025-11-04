@@ -4,6 +4,40 @@ import 'package:device_info_plus/device_info_plus.dart';
 class DeviceInfoService {
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
+  // Obtener el Android ID único del dispositivo
+  Future<String> getDeviceId() async {
+    try {
+      print('\n📱 Obteniendo Device ID único...');
+
+      if (Platform.isAndroid) {
+        final androidInfo = await _deviceInfo.androidInfo;
+        final androidId = androidInfo.id;
+
+        print('✅ Android ID obtenido:');
+        print('   - ID: $androidId');
+        print('   - Longitud: ${androidId.length} caracteres');
+
+        return androidId;
+      } else if (Platform.isIOS) {
+        final iosInfo = await _deviceInfo.iosInfo;
+        final iosId = iosInfo.identifierForVendor ?? 'unknown';
+
+        print('✅ iOS Identifier obtenido:');
+        print('   - ID: $iosId');
+
+        return iosId;
+      }
+
+      print('⚠️ Plataforma no soportada, usando ID genérico');
+      return 'unknown_${DateTime.now().millisecondsSinceEpoch}';
+
+    } catch (e) {
+      print('❌ Error al obtener Device ID: $e');
+      print('   Usando ID de fallback basado en timestamp');
+      return 'fallback_${DateTime.now().millisecondsSinceEpoch}';
+    }
+  }
+
   Future<Map<String, dynamic>> getDeviceInfo() async {
     Map<String, dynamic> deviceData = {};
 
@@ -21,6 +55,8 @@ class DeviceInfoService {
           // Se puede usar el ID único del dispositivo en su lugar
           'imei': androidInfo.id, // AndroidID como alternativa
           'serie': androidInfo.id, // Usar androidId como número de serie
+          'android_version': androidInfo.version.release,
+          'sdk_int': androidInfo.version.sdkInt,
         };
 
         print('📱 Información del dispositivo Android:');
@@ -30,6 +66,7 @@ class DeviceInfoService {
         print('   Fabricante: ${androidInfo.manufacturer}');
         print('   ID: ${androidInfo.id}');
         print('   Versión Android: ${androidInfo.version.release}');
+        print('   SDK: ${androidInfo.version.sdkInt}');
 
       } else if (Platform.isIOS) {
         final iosInfo = await _deviceInfo.iosInfo;
@@ -42,12 +79,14 @@ class DeviceInfoService {
           'type': 2, // 2 = iOS
           'imei': iosInfo.identifierForVendor ?? 'unknown',
           'serie': iosInfo.identifierForVendor ?? 'unknown',
+          'ios_version': iosInfo.systemVersion,
         };
 
         print('📱 Información del dispositivo iOS:');
         print('   Dispositivo: ${iosInfo.name}');
         print('   Modelo: ${iosInfo.model}');
         print('   ID: ${iosInfo.identifierForVendor}');
+        print('   iOS: ${iosInfo.systemVersion}');
       }
 
       return deviceData;

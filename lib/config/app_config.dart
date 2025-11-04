@@ -3,8 +3,11 @@ import 'dart:io';
 class AppConfig {
   // URL del backend - Se detecta automáticamente según el entorno
   static String get baseUrl {
+    // CONFIGURACIÓN: Cambiar esto a 'true' para usar servidor local en debug
+    const bool useLocalServer = false;
+
     // En modo debug, detectar el entorno
-    if (_isDebugMode) {
+    if (_isDebugMode && useLocalServer) {
       if (Platform.isAndroid) {
         // Para emulador Android: 10.0.2.2 apunta a localhost de la máquina host
         return 'http://10.0.2.2:8000/api/v1';
@@ -14,11 +17,9 @@ class AppConfig {
       }
       // Para dispositivos físicos en la misma red
       // return 'http://192.168.16.115:8000/api/v1';
-      // CAMBIADO: Ahora apunta a Railway
-      return 'https://inova.up.railway.app/api/v1';
     }
 
-    // En producción, usar dominio real
+    // En todos los demás casos (debug sin local server, o producción), usar Railway
     return 'https://inova.up.railway.app/api/v1';
   }
 
