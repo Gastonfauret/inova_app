@@ -122,9 +122,9 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
+    return PopScope(
       // Prevenir que el usuario salga con el botón de atrás
-      onWillPop: () async => false,
+      canPop: false,
       child: Scaffold(
         backgroundColor: Colors.red.shade900,
         body: SafeArea(

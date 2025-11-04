@@ -65,6 +65,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     } catch (e) {
       print('❌ Error al cargar información: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar información del dispositivo'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: _loadDeviceInformation,
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -260,13 +260,9 @@ class ApiService {
     print('   - Device Code: $deviceCode');
     print('   - FCM Token: ${fcmToken.substring(0, 20)}...');
 
-    // TODO: Implementar endpoint en backend
-    // final String endpoint = '/emm/device/$deviceCode/fcm-token';
+    final String endpoint = '/emm/device/$deviceCode/fcm-token';
 
     try {
-      // Por ahora solo simular éxito
-      // En producción, descomentar esto:
-      /*
       final response = await _dio.put(
         endpoint,
         data: {'fcm_token': fcmToken},
@@ -275,11 +271,10 @@ class ApiService {
       if (response.statusCode == 200) {
         print('✅ FCM Token actualizado en backend');
         return true;
+      } else {
+        print('⚠️ Backend respondió con código: ${response.statusCode}');
+        return false;
       }
-      */
-
-      print('⚠️ Endpoint no implementado - simulando éxito');
-      return true;
 
     } catch (e) {
       print('❌ Error al actualizar FCM token: $e');
@@ -291,14 +286,11 @@ class ApiService {
   Future<bool> sendHeartbeat(String deviceCode, Map<String, dynamic> data) async {
     print('\n💓 ENVIANDO HEARTBEAT AL BACKEND');
     print('   - Device Code: $deviceCode');
+    print('   - Data keys: ${data.keys.join(", ")}');
 
-    // TODO: Implementar endpoint en backend
-    // final String endpoint = '/emm/device/$deviceCode/heartbeat';
+    final String endpoint = '/emm/device/$deviceCode/heartbeat';
 
     try {
-      // Por ahora solo simular éxito
-      // En producción, descomentar esto:
-      /*
       final response = await _dio.post(
         endpoint,
         data: data,
@@ -306,12 +298,12 @@ class ApiService {
 
       if (response.statusCode == 200) {
         print('✅ Heartbeat enviado exitosamente');
+        print('   - Response: ${response.data}');
         return true;
+      } else {
+        print('⚠️ Backend respondió con código: ${response.statusCode}');
+        return false;
       }
-      */
-
-      print('⚠️ Endpoint no implementado - simulando éxito');
-      return true;
 
     } catch (e) {
       print('❌ Error al enviar heartbeat: $e');
@@ -347,13 +339,22 @@ class ApiService {
     print('   - Device Code: $deviceCode');
     print('   - Status: ${status['status']}');
 
-    // TODO: Implementar endpoint en backend
-    // final String endpoint = '/emm/device/$deviceCode/status';
+    final String endpoint = '/emm/device/$deviceCode/status';
 
     try {
-      // Por ahora solo simular éxito
-      print('⚠️ Endpoint no implementado - simulando éxito');
-      return true;
+      final response = await _dio.post(
+        endpoint,
+        data: status,
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Estado del dispositivo reportado exitosamente');
+        print('   - Response: ${response.data}');
+        return true;
+      } else {
+        print('⚠️ Backend respondió con código: ${response.statusCode}');
+        return false;
+      }
 
     } catch (e) {
       print('❌ Error al reportar estado: $e');
