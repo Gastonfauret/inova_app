@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:inova_app/services/device_info_service.dart';
+import 'package:inova_app/services/fcm_service.dart';
+import 'package:inova_app/screens/enrollment_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final FCMService? fcmService;
+
+  const HomeScreen({super.key, this.fcmService});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -96,6 +100,103 @@ class _HomeScreenState extends State<HomeScreen> {
         const SnackBar(
           content: Text('✅ Datos actualizados'),
           duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _unenrollDevice() async {
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('Cambiar Dispositivo'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro que deseas des-enrollar este dispositivo?\n\n'
+          'Podrás volver a enrollar este u otro dispositivo después.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    print('\n╔════════════════════════════════════════╗');
+    print('║     DES-ENROLLANDO DISPOSITIVO        ║');
+    print('╚════════════════════════════════════════╝');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Limpiar todas las preferencias de enrollment
+      print('🗑️ Limpiando SharedPreferences...');
+      await prefs.remove('isEnrolled');
+      await prefs.remove('device_code');
+      await prefs.remove('api_token');
+      await prefs.remove('selected_device_code');
+
+      // Limpiar configuraciones
+      final keys = prefs.getKeys();
+      for (final key in keys) {
+        if (key.startsWith('setting_') || key.startsWith('config_')) {
+          await prefs.remove(key);
+        }
+      }
+
+      print('✅ Enrollment limpiado exitosamente');
+      print('   - isEnrolled = false');
+      print('   - Todas las preferencias eliminadas');
+      print('╚════════════════════════════════════════╝\n');
+
+      if (!mounted) return;
+
+      // Navegar de vuelta al enrollment
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => EnrollmentScreen(
+            deviceCode: null,
+            fcmService: widget.fcmService,
+          ),
+        ),
+        (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Dispositivo des-enrollado. Ingrese un código para enrollar nuevamente.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+    } catch (e) {
+      print('❌ Error al des-enrollar: $e');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al des-enrollar: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -422,6 +523,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 icon: const Icon(Icons.help_outline),
                 label: const Text('Ayuda'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _unenrollDevice,
+                icon: const Icon(Icons.logout, color: Colors.red),
+                label: const Text('Cambiar Dispositivo'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
           ],

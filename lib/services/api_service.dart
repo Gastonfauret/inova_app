@@ -90,9 +90,34 @@ class ApiService {
         print('   ✓ device_code = $enrollmentCode');
 
         // Opcional: Guardar cualquier configuración recibida del backend
-        if (response.data is Map<String, dynamic>) {
+        // El backend puede enviar los datos en dos formatos:
+        // 1. Map directo: {key: value, ...}
+        // 2. Lista de objetos: [{key: "name", value: "val"}, ...]
+
+        Map<String, dynamic> settingsMap = {};
+
+        if (response.data is List) {
+          // Formato: [{key: "enterprise", value: "Gustavo Admin"}, ...]
+          print('\n💾 Procesando configuraciones (formato lista)...');
+          for (var item in response.data) {
+            if (item is Map && item.containsKey('key') && item.containsKey('value')) {
+              final key = item['key'];
+              final value = item['value'];
+              if (key != null && value != null) {
+                settingsMap[key] = value;
+              }
+            }
+          }
+        } else if (response.data is Map<String, dynamic>) {
+          // Formato: {enterprise: "Gustavo Admin", status: 1, ...}
+          print('\n💾 Procesando configuraciones (formato map)...');
+          settingsMap = response.data;
+        }
+
+        // Guardar todas las configuraciones
+        if (settingsMap.isNotEmpty) {
           print('\n💾 Guardando configuraciones adicionales del servidor...');
-          for (var entry in response.data.entries) {
+          for (var entry in settingsMap.entries) {
             final key = entry.key;
             final value = entry.value;
             if (value is String) {
@@ -104,6 +129,10 @@ class ApiService {
             } else if (value is int) {
               await prefs.setInt('setting_$key', value);
               print('   ✓ setting_$key (int) = $value');
+            } else if (value != null) {
+              // Para otros tipos, convertir a string
+              await prefs.setString('setting_$key', value.toString());
+              print('   ✓ setting_$key (${value.runtimeType}) = $value');
             }
           }
         }

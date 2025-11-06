@@ -178,9 +178,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Widget _buildInitialScreen() {
     if (!widget.isEnrolled) {
-      // Si no está enrolado, ir al flujo de login y selección de dispositivo
-      // NUEVO FLUJO: LoginEnrollmentScreen -> DeviceSelectionScreen -> EnrollmentScreen
-      return LoginEnrollmentScreen(fcmService: widget.fcmService);
+      // Si no está enrolado, ir directo a ingresar código de dispositivo
+      return EnrollmentScreen(
+        deviceCode: _deviceCode,
+        fcmService: widget.fcmService,
+      );
     }
 
     if (_isLocked) {
@@ -188,7 +190,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     // Si está enrolado y no bloqueado, va a la pantalla principal.
-    return const HomeScreen();
+    return HomeScreen(fcmService: widget.fcmService);
   }
 
   Widget _buildLockScreen() {

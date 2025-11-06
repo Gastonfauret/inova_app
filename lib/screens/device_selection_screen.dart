@@ -101,11 +101,12 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
 
     if (!mounted) return;
 
-    // Navegar a EnrollmentScreen con el dispositivo seleccionado
+    // Navegar a EnrollmentScreen (ya no se usa este flujo, pero se mantiene por compatibilidad)
+    // NOTA: Este flujo ya no está activo. La app ahora va directo a EnrollmentScreen.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => EnrollmentScreen(
-          selectedDeviceCode: device.code,
+          deviceCode: device.code,
           fcmService: widget.fcmService,
         ),
       ),
