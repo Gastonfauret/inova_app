@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:inova_app/config/app_config.dart';
 import 'package:inova_app/screens/enrollment_screen.dart';
+import 'package:inova_app/screens/login_enrollment_screen.dart';
 import 'package:inova_app/screens/home_screen.dart';
 import 'package:inova_app/screens/lock_screen.dart';
 import 'package:inova_app/services/fcm_service.dart';
@@ -177,12 +178,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Widget _buildInitialScreen() {
     if (!widget.isEnrolled) {
-      // Si no está enrolado, siempre va a la pantalla de enrolamiento.
-      // El deviceCode nativo y el fcmService se pasan para el proceso.
-      return EnrollmentScreen(
-        deviceCode: _deviceCode,
-        fcmService: widget.fcmService,
-      );
+      // Si no está enrolado, ir al flujo de login y selección de dispositivo
+      // NUEVO FLUJO: LoginEnrollmentScreen -> DeviceSelectionScreen -> EnrollmentScreen
+      return LoginEnrollmentScreen(fcmService: widget.fcmService);
     }
 
     if (_isLocked) {

@@ -92,7 +92,9 @@ class ApiService {
         // Opcional: Guardar cualquier configuración recibida del backend
         if (response.data is Map<String, dynamic>) {
           print('\n💾 Guardando configuraciones adicionales del servidor...');
-          response.data.forEach((key, value) async {
+          for (var entry in response.data.entries) {
+            final key = entry.key;
+            final value = entry.value;
             if (value is String) {
               await prefs.setString('setting_$key', value);
               print('   ✓ setting_$key (String) = $value');
@@ -103,7 +105,7 @@ class ApiService {
               await prefs.setInt('setting_$key', value);
               print('   ✓ setting_$key (int) = $value');
             }
-          });
+          }
         }
 
         print('\n✅ ¡ENROLLMENT COMPLETADO EXITOSAMENTE!');
@@ -159,57 +161,6 @@ class ApiService {
       print('   - Stack trace disponible en logs completos');
       print('════════════════════════════════════════\n');
       return false;
-    }
-  }
-
-  // Método de autenticación con client credentials
-  Future<Map<String, dynamic>> login(String clientId, String secret) async {
-    final String endpoint = '/customer/auth/login';
-    print('🚀 Realizando petición de login a: $endpoint');
-
-    try {
-      final response = await _dio.post(
-        endpoint,
-        data: {
-          'client': clientId,
-          'secret': secret,
-        },
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        print('✅ Login exitoso');
-
-        // Guardar el token en SharedPreferences
-        if (response.data['token'] != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', response.data['token']);
-        }
-
-        return response.data as Map<String, dynamic>;
-      } else {
-        return {
-          'token': null,
-          'message': 'Respuesta inesperada del servidor'
-        };
-      }
-    } on DioException catch (e) {
-      print('❌ Error de autenticación: $e');
-      if (e.response != null && e.response?.statusCode == 404) {
-        return {
-          'token': null,
-          'message': 'Credenciales inválidas'
-        };
-      }
-      return {
-        'token': null,
-        'message': 'Error de conexión'
-      };
-    } catch (e) {
-      print('❌ Error inesperado: $e');
-      return {
-        'token': null,
-        'message': 'Ocurrió un error inesperado'
-      };
     }
   }
 
@@ -359,6 +310,100 @@ class ApiService {
     } catch (e) {
       print('❌ Error al reportar estado: $e');
       return false;
+    }
+  }
+
+  /// Login de cliente para enrollment
+  /// Retorna el token de autenticación si es exitoso
+  Future<String?> login({
+    required String client,
+    required String secret,
+  }) async {
+    print('\n🔐 LOGIN API');
+    print('   - Client: $client');
+    final String endpoint = '/customer/auth/login';
+
+    try {
+      final response = await _dio.post(
+        endpoint,
+        data: {
+          'client': client,
+          'secret': secret,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final token = response.data['token'];
+        print('✅ Login exitoso, token recibido');
+        return token;
+      } else {
+        print('⚠️ Login falló: ${response.statusCode}');
+        return null;
+      }
+    } on DioException catch (e) {
+      print('❌ Error DioException en login: ${e.message}');
+      if (e.response != null) {
+        print('   - Status: ${e.response?.statusCode}');
+        print('   - Data: ${e.response?.data}');
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error general en login: $e');
+      return null;
+    }
+  }
+
+  /// Obtener lista de dispositivos del customer autenticado
+  Future<List<dynamic>> getCustomerDevices() async {
+    print('\n📱 OBTENIENDO DISPOSITIVOS DEL CUSTOMER');
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('api_token');
+
+    if (token == null) {
+      print('❌ No hay token de autenticación');
+      throw Exception('No authenticated');
+    }
+
+    final String endpoint = '/customer/devices';
+
+    try {
+      final response = await _dio.get(
+        endpoint,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        print('✅ Dispositivos obtenidos');
+
+        // El backend puede retornar la lista directamente o en data.data
+        if (response.data is List) {
+          return response.data as List;
+        } else if (response.data['data'] is List) {
+          return response.data['data'] as List;
+        } else {
+          print('⚠️ Formato de respuesta inesperado');
+          return [];
+        }
+      } else {
+        print('⚠️ Backend respondió con: ${response.statusCode}');
+        return [];
+      }
+    } on DioException catch (e) {
+      print('❌ Error DioException al obtener dispositivos: ${e.message}');
+      if (e.response != null) {
+        print('   - Status: ${e.response?.statusCode}');
+        print('   - Data: ${e.response?.data}');
+      }
+      throw Exception('Failed to load devices: ${e.message}');
+    } catch (e) {
+      print('❌ Error general al obtener dispositivos: $e');
+      throw Exception('Failed to load devices: $e');
     }
   }
 }

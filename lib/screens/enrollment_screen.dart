@@ -8,9 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class EnrollmentScreen extends StatefulWidget {
   final String? deviceCode; // Este código puede venir del lado nativo (UID)
+  final String? selectedDeviceCode; // Código del dispositivo seleccionado desde DeviceSelectionScreen
   final FCMService? fcmService;
 
-  const EnrollmentScreen({super.key, this.deviceCode, this.fcmService});
+  const EnrollmentScreen({
+    super.key,
+    this.deviceCode,
+    this.selectedDeviceCode,
+    this.fcmService,
+  });
 
   @override
   State<EnrollmentScreen> createState() => _EnrollmentScreenState();
@@ -28,8 +34,16 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   @override
   void initState() {
     super.initState();
-    // No pre-rellenamos el código, el usuario debe introducir el que ve en la web.
-    // widget.deviceCode se usará como el UID del dispositivo.
+    // Si viene del flujo de selección de dispositivo, pre-rellenar el código
+    if (widget.selectedDeviceCode != null && widget.selectedDeviceCode!.isNotEmpty) {
+      _codeController.text = widget.selectedDeviceCode!;
+      print('✅ Código de dispositivo seleccionado: ${widget.selectedDeviceCode}');
+      // Realizar enrollment automáticamente si viene del flujo de selección
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _enrollDevice();
+      });
+    }
+    // widget.deviceCode se usará como el UID del dispositivo (del Platform Channel).
   }
 
   Future<void> _enrollDevice() async {
@@ -173,14 +187,17 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                const Text(
-                  'Por favor, ingrese su código de enlace para continuar.',
+                Text(
+                  widget.selectedDeviceCode != null
+                      ? 'Enrolando dispositivo seleccionado...'
+                      : 'Por favor, ingrese su código de enlace para continuar.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _codeController,
+                  enabled: widget.selectedDeviceCode == null, // Deshabilitar si viene del flujo de selección
                   decoration: const InputDecoration(
                     labelText: 'Código de Enlace',
                     border: OutlineInputBorder(),

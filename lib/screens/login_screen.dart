@@ -37,12 +37,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final response = await _apiService.login(
-        _clientController.text.trim(),
-        _secretController.text,
+      final token = await _apiService.login(
+        client: _clientController.text.trim(),
+        secret: _secretController.text,
       );
 
-      if (response['token'] != null) {
+      if (token != null && token.isNotEmpty) {
         // Login exitoso, navegar a la pantalla de enrollment
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         setState(() {
-          _errorMessage = response['message'] ?? 'Error de autenticación';
+          _errorMessage = 'Credenciales inválidas';
           _isLoading = false;
         });
       }
