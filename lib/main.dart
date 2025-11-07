@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:inova_app/config/app_config.dart';
 import 'package:inova_app/screens/enrollment_screen.dart';
-import 'package:inova_app/screens/login_enrollment_screen.dart';
 import 'package:inova_app/screens/home_screen.dart';
 import 'package:inova_app/screens/lock_screen.dart';
 import 'package:inova_app/services/fcm_service.dart';

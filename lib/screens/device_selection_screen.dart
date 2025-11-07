@@ -220,14 +220,71 @@ class _DeviceSelectionScreenState extends State<DeviceSelectionScreen> {
                                   ),
                                 ],
                               ),
-                              trailing: const Icon(Icons.arrow_forward_ios),
-                              onTap: () => _selectDevice(device),
+                              onTap: () => _showDeviceActionsDialog(device),
                             ),
                           );
                         },
                       ),
                     ),
     );
+  }
+
+  void _showDeviceActionsDialog(DeviceModel device) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // El estado 2 es 'LOCKED'
+        bool isLocked = device.status == 2;
+
+        return AlertDialog(
+          title: Text(device.device ?? 'Dispositivo'),
+          content: Text('¿Qué acción deseas realizar en ${device.brand ?? ""} ${device.model ?? ""}?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: isLocked ? null : () async {
+                Navigator.of(context).pop(); // Cerrar el diálogo
+                await _performDeviceAction(device.id, _apiService.lockDevice, 'Bloqueando...');
+              },
+              child: const Text('Bloquear'),
+            ),
+            TextButton(
+              onPressed: !isLocked ? null : () async {
+                Navigator.of(context).pop(); // Cerrar el diálogo
+                await _performDeviceAction(device.id, _apiService.unlockDevice, 'Desbloqueando...');
+              },
+              child: const Text('Desbloquear'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performDeviceAction(int deviceId, Future<bool> Function(int) action, String message) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$message (ID: $deviceId)')),
+    );
+
+    final success = await action(deviceId);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success ? 'Acción completada con éxito' : 'Falló la operación'),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
+
+    // Recargar la lista de dispositivos para reflejar el cambio de estado
+    await _loadDevices();
   }
 
   Color _getStatusColor(int status) {

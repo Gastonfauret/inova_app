@@ -435,4 +435,98 @@ class ApiService {
       throw Exception('Failed to load devices: $e');
     }
   }
+
+  /// Bloquear un dispositivo del customer autenticado
+  Future<bool> lockDevice(int deviceId) async {
+    print('\n🔒 BLOQUEANDO DISPOSITIVO');
+    print('   - Device ID: $deviceId');
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('api_token');
+
+    if (token == null) {
+      print('❌ No hay token de autenticación');
+      throw Exception('Not authenticated');
+    }
+
+    final String endpoint = '/customer/devices/lock/$deviceId';
+
+    try {
+      final response = await _dio.get(
+        endpoint,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Dispositivo bloqueado exitosamente');
+        return true;
+      } else {
+        print('⚠️ Backend respondió con: ${response.statusCode}');
+        print('   - Data: ${response.data}');
+        return false;
+      }
+    } on DioException catch (e) {
+      print('❌ Error DioException al bloquear dispositivo: ${e.message}');
+      if (e.response != null) {
+        print('   - Status: ${e.response?.statusCode}');
+        print('   - Data: ${e.response?.data}');
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error general al bloquear dispositivo: $e');
+      return false;
+    }
+  }
+
+  /// Desbloquear un dispositivo del customer autenticado
+  Future<bool> unlockDevice(int deviceId) async {
+    print('\n🔓 DESBLOQUEANDO DISPOSITIVO');
+    print('   - Device ID: $deviceId');
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('api_token');
+
+    if (token == null) {
+      print('❌ No hay token de autenticación');
+      throw Exception('Not authenticated');
+    }
+
+    final String endpoint = '/customer/devices/unlock/$deviceId';
+
+    try {
+      final response = await _dio.get(
+        endpoint,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Dispositivo desbloqueado exitosamente');
+        return true;
+      } else {
+        print('⚠️ Backend respondió con: ${response.statusCode}');
+        print('   - Data: ${response.data}');
+        return false;
+      }
+    } on DioException catch (e) {
+      print('❌ Error DioException al desbloquear dispositivo: ${e.message}');
+      if (e.response != null) {
+        print('   - Status: ${e.response?.statusCode}');
+        print('   - Data: ${e.response?.data}');
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error general al desbloquear dispositivo: $e');
+      return false;
+    }
+  }
 }

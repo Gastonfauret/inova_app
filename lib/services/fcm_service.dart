@@ -218,7 +218,8 @@ class FCMService {
     print('🔒 COMANDO: BLOQUEAR DISPOSITIVO');
 
     final String title = data['title'] ?? 'Dispositivo Bloqueado';
-    final String message = data['message'] ?? 'Este dispositivo ha sido bloqueado remotamente.';
+    // El backend envía 'body', no 'message'
+    final String message = data['body'] ?? data['message'] ?? 'Este dispositivo ha sido bloqueado remotamente.';
 
     await prefs.setBool('device_locked', true);
     await prefs.setString('lock_title', title);

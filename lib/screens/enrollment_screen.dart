@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:inova_app/screens/home_screen.dart';
+import 'package:inova_app/screens/simple_qr_scanner.dart';
 import 'package:inova_app/services/api_service.dart';
 import 'package:inova_app/services/fcm_service.dart';
 import 'package:inova_app/services/device_info_service.dart';
@@ -36,6 +37,42 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
     // widget.deviceCode se usará como el UID del dispositivo (del Platform Channel).
     print('📱 EnrollmentScreen iniciado');
     print('   - FCM Service disponible: ${widget.fcmService != null}');
+
+    // Si viene con deviceCode del Platform Channel, auto-completar
+    if (widget.deviceCode != null && widget.deviceCode!.isNotEmpty) {
+      _codeController.text = widget.deviceCode!;
+      print('✅ Device code auto-completado desde Platform Channel: ${widget.deviceCode}');
+      // Auto-iniciar enrollment después de un breve delay para que el usuario vea qué pasa
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          print('🚀 Iniciando auto-enrollment...');
+          _enrollDevice();
+        }
+      });
+    }
+  }
+
+  Future<void> _scanQRCode() async {
+    print('📷 Abriendo QR Scanner...');
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SimpleQRScanner(),
+      ),
+    );
+
+    if (result != null && result is String) {
+      print('✅ QR escaneado: $result');
+      setState(() {
+        _codeController.text = result;
+      });
+      // Auto-iniciar enrollment después de escanear
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _enrollDevice();
+        }
+      });
+    }
   }
 
   Future<void> _enrollDevice() async {
@@ -220,7 +257,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
 
                 // Descripción
                 const Text(
-                  'Ingrese el código de su dispositivo para comenzar el proceso de enrollment.',
+                  'Ingrese el código de su dispositivo o escanee el código QR proporcionado.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 15, color: Colors.grey),
                 ),
@@ -253,7 +290,42 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+
+                // Botón para escanear QR
+                if (!_isLoading)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _scanQRCode,
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Escanear Código QR'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: const TextStyle(fontSize: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
+                // Separador
+                if (!_isLoading)
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('O', style: TextStyle(color: Colors.grey)),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+
+                const SizedBox(height: 16),
 
                 // Botón de enrollment
                 if (_isLoading)
