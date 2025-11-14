@@ -1,4 +1,4 @@
-package inova.guard.mdm // O cual sea tu package name
+package inova.guard.app
 
 import android.app.admin.DevicePolicyManager
 import android.content.Intent
@@ -9,7 +9,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
     // 1. Define el nombre del canal (DEBE SER IDÉNTICO AL DE DART)
-    private val CHANNEL_NAME = "inova.guard.mdm/provisioning"
+    private val CHANNEL_NAME = "inova.guard.app/provisioning"
     private var channel: MethodChannel? = null
 
     // 2. Variable para guardar el código cuando la app se inicia
@@ -23,8 +23,8 @@ class MainActivity: FlutterActivity() {
             DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE
         )
         if (extras != null) {
-            // La clave "inova.guard.mdm.DEVICE_CODE" DEBE ser idéntica a la del JSON de Laravel
-            deviceCode = extras.getString("inova.guard.mdm.DEVICE_CODE")
+            // La clave "inova.guard.app.DEVICE_CODE" DEBE ser idéntica a la del JSON de Laravel
+            deviceCode = extras.getString("inova.guard.app.DEVICE_CODE")
             android.util.Log.i("MainActivity", "DeviceCode recibido del Intent: $deviceCode")
         } else {
             android.util.Log.w("MainActivity", "No se recibieron extras de aprovisionamiento.")

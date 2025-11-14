@@ -1,4 +1,4 @@
-package inova.guard.mdm.receivers
+package inova.guard.app.receivers
 
 import android.app.admin.DeviceAdminReceiver
 import android.content.Context

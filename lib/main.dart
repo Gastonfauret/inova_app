@@ -81,7 +81,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  static const platform = MethodChannel('inova.guard.mdm/provisioning');
+  static const platform = MethodChannel('inova.guard.app/provisioning');
   final HeartbeatService _heartbeatService = HeartbeatService();
 
   String? _deviceCode;

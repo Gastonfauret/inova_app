@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "inova.guard.mdm"
+    namespace = "inova.guard.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "inova.guard.mdm"
+        applicationId = "inova.guard.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = 1
